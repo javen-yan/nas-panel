@@ -59,7 +59,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/javen-yan/nas-panel.git
 cd nas-panel
 ```
 
@@ -95,51 +95,9 @@ pio device monitor
 
 ### 4. 服务端数据发布
 
-#### 方式一：使用Python脚本
-```bash
-# 安装依赖
-pip install -r requirements.txt
+#### 使用 NasPanelServer
 
-# 运行数据发布器
-python mqtt_publisher.py --host YOUR_MQTT_SERVER --topic nas/stats
-```
-
-#### 方式二：集成到现有NAS系统
-根据您的NAS系统（如Synology、QNAP、TrueNAS等），创建脚本定期发布以下JSON格式数据：
-
-```json
-{
-  "hostname": "NAS-Server",
-  "ip": "192.168.1.100",
-  "timestamp": "2023-12-01T22:58:00",
-  "cpu": {
-    "usage": 35.5,
-    "temperature": 45.2
-  },
-  "memory": {
-    "usage": 67.8,
-    "temperature": 38.1,
-    "total": 17179869184,
-    "used": 11659091968
-  },
-  "storage": {
-    "capacity": 32000000000000,
-    "used": 18000000000000,
-    "disks": [
-      {"id": "hdd1", "status": "normal"},
-      {"id": "hdd2", "status": "normal"},
-      {"id": "hdd3", "status": "warning"},
-      {"id": "hdd4", "status": "normal"},
-      {"id": "hdd5", "status": "error"},
-      {"id": "hdd6", "status": "normal"}
-    ]
-  },
-  "network": {
-    "upload": 2812000,
-    "download": 9400000
-  }
-}
-```
+ [NasPanelServer](https://github.com/javen-yan/nas-panel-server.git)
 
 ## 配置文件
 
@@ -213,11 +171,3 @@ MIT License - 详见 LICENSE 文件
 ## 贡献
 
 欢迎提交Issue和Pull Request来改进这个项目。
-
-## 更新日志
-
-### v1.0.0
-- 初始版本发布
-- 基础NAS监控功能
-- WiFi配网和MQTT连接
-- 现代化UI设计

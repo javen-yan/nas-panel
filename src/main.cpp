@@ -41,7 +41,7 @@ String mqttServer = "";
 int mqttPort = 1883;
 String mqttUser = "";
 String mqttPassword = "";
-String mqttTopic = "nas/stats";
+String mqttTopic = "nas/panel/data";
 
 // 显示相关变量
 unsigned long lastDisplayUpdate = 0;
