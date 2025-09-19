@@ -63,6 +63,7 @@ void initDisplay();
 void initWiFi();
 void initMQTT();
 void initWebServer();
+bool validateMQTTConfig();
 void connectMQTT();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void updateDisplay();
@@ -81,7 +82,14 @@ void setup() {
     // 初始化SPIFFS
     if (!SPIFFS.begin(true)) {
         Serial.println("SPIFFS Mount Failed");
-        return;
+        // 显示错误信息
+        tft.fillScreen(COLOR_BACKGROUND);
+        tft.setTextColor(COLOR_DANGER);
+        tft.setTextSize(1);
+        tft.drawString("SPIFFS Error", 80, 100);
+        tft.drawString("Restarting...", 70, 120);
+        delay(3000);
+        ESP.restart();
     }
     
     // 加载配置
@@ -162,6 +170,13 @@ void initWiFi() {
     // 自动连接WiFi，如果失败则启动配置门户
     if (!wm.autoConnect("NAS-Panel")) {
         Serial.println("Failed to connect and hit timeout");
+        // 显示连接失败信息
+        tft.fillScreen(COLOR_BACKGROUND);
+        tft.setTextColor(COLOR_DANGER);
+        tft.setTextSize(1);
+        tft.drawString("WiFi Connection Failed", 40, 100);
+        tft.drawString("Restarting...", 80, 120);
+        delay(3000);
         ESP.restart();
     }
     
@@ -184,8 +199,17 @@ void initMQTT() {
     }
 }
 
+bool validateMQTTConfig() {
+    if (mqttServer.length() == 0) return false;
+    if (mqttPort < 1 || mqttPort > 65535) return false;
+    return true;
+}
+
 void connectMQTT() {
-    if (mqttServer.length() == 0) return;
+    if (!validateMQTTConfig()) {
+        Serial.println("Invalid MQTT configuration");
+        return;
+    }
     
     while (!mqttClient.connected()) {
         Serial.print("Attempting MQTT connection...");
@@ -216,7 +240,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     
     // 解析JSON数据
     DynamicJsonDocument doc(1024);
-    deserializeJson(doc, message);
+    DeserializationError error = deserializeJson(doc, message);
+    
+    if (error) {
+        Serial.print("JSON parsing failed: ");
+        Serial.println(error.c_str());
+        return;
+    }
     
     // 更新NAS数据
     nasData.hostname = doc["hostname"].as<String>();
@@ -269,7 +299,12 @@ void drawNASPanel() {
     
     // 绘制时间和IP
     tft.setTextColor(COLOR_TEXT_SECONDARY);
-    tft.drawString("22:58", 180, 10);
+    // 显示当前时间
+    unsigned long currentTime = millis() / 1000;
+    int hours = (currentTime / 3600) % 24;
+    int minutes = (currentTime / 60) % 60;
+    String timeStr = String(hours) + ":" + (minutes < 10 ? "0" : "") + String(minutes);
+    tft.drawString(timeStr, 180, 10);
     tft.drawString(nasData.ip, 140, 25);
     
     // 绘制容量信息
@@ -330,10 +365,10 @@ void drawDiskStatus() {
     int yPos = 190;
     tft.setTextColor(COLOR_TEXT_PRIMARY);
     
-    // 磁盘状态网格
-    String diskLabels[] = {"HDD 1", "HDD 4", "HDD 2", "HDD 5", "HDD 3", "HDD 6", "M.2 1", "M.2 2"};
+    // 磁盘状态网格 - 只显示6个磁盘，避免数组越界
+    String diskLabels[] = {"HDD 1", "HDD 2", "HDD 3", "HDD 4", "HDD 5", "HDD 6"};
     
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         int col = i % 2;
         int row = i / 2;
         int x = 30 + col * 90;
@@ -345,9 +380,9 @@ void drawDiskStatus() {
         
         // 绘制状态指示器
         uint16_t statusColor = COLOR_SUCCESS;
-        if (i < 6 && nasData.diskStatus[i] == "error") {
+        if (nasData.diskStatus[i] == "error") {
             statusColor = COLOR_DANGER;
-        } else if (i < 6 && nasData.diskStatus[i] == "warning") {
+        } else if (nasData.diskStatus[i] == "warning") {
             statusColor = COLOR_WARNING;
         }
         
@@ -448,7 +483,14 @@ void initWebServer() {
     server.on("/config", HTTP_POST, [](AsyncWebServerRequest *request){}, NULL, 
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
             DynamicJsonDocument doc(1024);
-            deserializeJson(doc, (char*)data);
+            DeserializationError error = deserializeJson(doc, (char*)data);
+            
+            if (error) {
+                Serial.print("Config JSON parsing failed: ");
+                Serial.println(error.c_str());
+                request->send(400, "text/plain", "Invalid JSON");
+                return;
+            }
             
             mqttServer = doc["mqttServer"].as<String>();
             mqttPort = doc["mqttPort"];
